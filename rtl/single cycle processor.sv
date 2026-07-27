@@ -1,4 +1,4 @@
- module regfile(
+  module regfile(
     input logic clk,WER,
     input logic [4:0] A1,A2,A3,
     input logic [31:0] WD3,
@@ -29,9 +29,12 @@ module datamem(
     input logic[2:0] funct3,
     input logic[31:0] DADR,
     input logic[31:0] WD,
-    output logic [31:0]RDM
+    output logic [31:0]RDM,
+    output logic pcstall
 );
 logic [31:0] mem2 [0:255];
+logic misaligned_wr;
+assign misaligned_wr=(memwrite)&(((funct3==3'b001)&(DADR[1:0]==2'b11))|((funct3==3'b010)&(DADR[1:0]!=2'b00))|((funct3==3'b101)&(DADR[1:0]==2'b11)));
 always_comb begin
     if(memread) begin
         unique case(funct3)
@@ -44,12 +47,20 @@ always_comb begin
                 endcase
             end
             3'b001: begin
-                case(DADR[1])
-                    1'b0:RDM={{16{mem2[DADR[31:2]][15]}},mem2[DADR[31:2]][15:0]};
-                    1'b1:RDM={{16{mem2[DADR[31:2]][31]}},mem2[DADR[31:2]][31:16]};
-                endcase
+                case(DADR[1:0])
+                    2'b00:RDM={{16{mem2[DADR[31:2]][15]}},mem2[DADR[31:2]][15:0]};
+                    2'b01:RDM={{16{mem2[DADR[31:2]][23]}},mem2[DADR[31:2]][23:8]};
+                    2'b10:RDM={{16{mem2[DADR[31:2]][31]}},mem2[DADR[31:2]][31:16]};
+                    2'b11:RDM=mem2[DADR[31:2]];
+                
             end
-            3'b010: RDM=mem2[DADR[31:2]];
+            3'b010:begin
+                unique case(DADR[1:0])
+                    2'b00:RDM=mem2[DADR[31:2]];
+                    2'b01:RDM=mem2[DADR[31:2]];
+                    2'b10:RDM=mem2[DADR[31:2]];
+                    2'b11:RDM=mem2[DADR[31:2]];
+                endcase
             3'b100:begin
                 case(DADR[1:0])
                     2'b00:RDM={{24{1'b0}},mem2[DADR[31:2]][7:0]};
@@ -59,19 +70,71 @@ always_comb begin
                 endcase
             end
             3'b101:begin
-                case(DADR[1])
-                    1'b0:RDM={{16{1'b0}},mem2[DADR[31:2]][15:0]};
-                    1'b1:RDM={{16{1'b0}},mem2[DADR[31:2]][31:16]};
+                case(DADR[1:0])
+                    2'b00:RDM={{16{1'b0}},mem2[DADR[31:2]][15:0]};
+                    2'b01:RDM={{16{1'b0}},mem2[DADR[31:2]][23:8]};
+                    2'b10:RDM={{16{1'b0}},mem2[DADR[31:2]][31:16]};
+                    2'b11:RDM=mem2[DADR[31:2]];
                 endcase
             end
         endcase
     end
 end
+logic [31:0] RDM2,RD;
+assign RD=
+typedef enum logic { 
+    idle,
+    readsec
+} state;
+always_ff@(posedge clk) begin
+    case(state)
+        idle: begin
+            if(!(misaligned_wr)) begin
+                state<=readsec;
+            end
+        end
+        readsec: begin
+            case(funct3)
+                3'b001:begin
+                    if(DADR[1:0]==2'b11) begin
+                        RDM2<=mem2[DADR[31:0]+32'b1];
+
+
+           
 
 
 
-            
 
+
+
+
+
+
+
+
+
+
+always_ff@(posedge clk) begin
+    if(memwrite) begin
+        unique case(funct3) 
+            3'b000:begin
+                unique case(DADR[1:0])
+                    2'b00:mem2[DADR[31:2]][7:0]<=WD[7:0];
+                    2'b01:mem2[DADR[31:2]][15:8]<=WD[7:0];
+                    2'b10:mem2[DADR[31:2]][23:16]<=WD[7:0];
+                    2'b11:mem2[DADR[31:2]][31:24]<=WD[7:0];
+                endcase
+            end
+            3'b001:begin
+                unique case(DADR[1])
+                    1'b0:mem2[DADR[31:2]][15:0]<=WD[15:0];
+                    1'b1:mem2[DADR[31:2]][31:16]<=WD[15:0];
+                endcase
+            end
+            3'b010:mem2[DADR[31:2]]<=WD;
+        endcase
+    end
+end
 endmodule
 
 module extend(
@@ -89,6 +152,30 @@ always_comb begin
         3'b101: IMM=32'b0; // rtype
         3'b110: IMM={ {20{INSTR[31]}}, INSTR[31:20] };//load type
     endcase
+end
+endmodule
+
+module pc(
+    input logic clk,pcstall,pcsrc,rst,
+    input logic[31:0] jumpval,
+    output logic [31:0] instad
+);
+
+always_ff@(posedge clk,posedge rst) begin
+    if(rst) instad<=32'b0;
+    else begin
+        if(pcstall) begin
+         instad<=instad;
+        end
+        else begin
+            if(pcsrc) begin
+                instad<=instad+jumpval;
+            end
+            else begin
+                instad<=instad+{{29{1'b0}},3'b100};
+            end
+        end
+    end
 end
 endmodule
 
@@ -166,8 +253,7 @@ always_combff begin
             endcase
         end
         7'b0000011: begin
-            IMMCTRL=3'b000; ALUSRC=1; ALUCTRL=4'b0000; RESULTSRC=1; WER=1; WED=0;
-
+            IMMCTRL=3'b000; ALUSRC=1; ALUCTRL=4'b0000; RESULTSRC=1; WER=1; WED=0;git
 
         
 
