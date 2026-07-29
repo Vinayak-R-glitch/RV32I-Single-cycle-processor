@@ -25,16 +25,15 @@ end
 endmodule
 
 module datamem(  
-    input logic clk,WED,memread,memwrite,
+    input logic clk,WED,memread,memwrite,misalign_seq,
     input logic[2:0] funct3,
-    input logic[31:0] DADR,
+    input logic[31:0] res, //alu result
     input logic[31:0] WD,
-    output logic [31:0]RDM,
-    output logic pcstall
+    output logic [31:0]RDM
 );
 logic [31:0] mem2 [0:255];
-logic misaligned_wr;
-assign misaligned_wr=(memwrite)&(((funct3==3'b001)&(DADR[1:0]==2'b11))|((funct3==3'b010)&(DADR[1:0]!=2'b00))|((funct3==3'b101)&(DADR[1:0]==2'b11)));
+logic [31:0] DADR;
+assign DADR=misalign_seq((res+32'b4):(res));
 always_comb begin
     if(memread) begin
         unique case(funct3)
@@ -80,62 +79,87 @@ always_comb begin
         endcase
     end
 end
-logic [31:0] RDM2,RD;
-assign RD=
-typedef enum logic { 
-    idle,
-    readsec
-} state;
-always_ff@(posedge clk) begin
-    case(state)
-        idle: begin
-            if(!(misaligned_wr)) begin
-                state<=readsec;
-            end
-        end
-        readsec: begin
-            case(funct3)
-                3'b001:begin
-                    if(DADR[1:0]==2'b11) begin
-                        RDM2<=mem2[DADR[31:0]+32'b1];
 
-
-           
-
-
-
-
-
-
-
-
-
-
-
-
-
-always_ff@(posedge clk) begin
-    if(memwrite) begin
-        unique case(funct3) 
-            3'b000:begin
-                unique case(DADR[1:0])
-                    2'b00:mem2[DADR[31:2]][7:0]<=WD[7:0];
-                    2'b01:mem2[DADR[31:2]][15:8]<=WD[7:0];
-                    2'b10:mem2[DADR[31:2]][23:16]<=WD[7:0];
-                    2'b11:mem2[DADR[31:2]][31:24]<=WD[7:0];
+always_comb begin
+    if (memwrite&WED) begin
+        unique case(funct3)
+            3'b000: begin
+                case(DADR[1:0])
+                    2'b00:mem2[DADR[31:2]][7:0]=WD[7:0];
+                    2'b01:mem2[DADR[31:2]][15:8]=WD[7:0];
+                    2'b10:mem2[DADR[31:2]][23:16]=WD[7:0];
+                    2'b11:mem2[DADR[31:2]][31:24]=WD[7:0];
                 endcase
             end
-            3'b001:begin
-                unique case(DADR[1])
-                    1'b0:mem2[DADR[31:2]][15:0]<=WD[15:0];
-                    1'b1:mem2[DADR[31:2]][31:16]<=WD[15:0];
+            3'b001: begin
+                case(DADR[1:0])
+                    2'b00:mem2[DADR[31:2]][15:0]=WD[15:0];
+                    2'b01:mem2[DADR[31:2]][23:8]=WD[15:0];
+                    2'b10:mem2[DADR[31:2]][31:16]=WD[15:0];
+                    2'b11:begin
+                        if(!misalign_seq)mem2[DADR[31:2]][31:24]=WD[7:0];
+                        else mem2[DADR[31:2]][7:0]=WD[15:8];
+                    end
                 endcase
             end
-            3'b010:mem2[DADR[31:2]]<=WD;
+            3'b010: begin
+                case(DADR[1:0])
+                    2'b00:mem2[DADR[31:2]]=WD;
+                    2'b01:begin
+                        if(!misalign_seq) mem2[DADR[31:2]][31:8]=WD[23:0];
+                        else mem2[DADR[31:2]][7:0]=WD[31:24];
+                    end
+                    2'b10:begin
+                        if(!misalign_seq) mem2[DADR[31:2]][31:16]=WD[15:0];
+                        else mem2[DADR[31:2]][15:0]=WD[31:0];
+                    end
+                    2'b11:begin
+                        if(!misalign_seq) mem2[DADR[31:2]][31:24]=WD[7:0];
+                        else mem2[DADR[31:2]][23:0]=WD[31:8];
+                    end
+                endcase
+            end
         endcase
     end
 end
 endmodule
+
+                        
+
+module datamem_outhandler(
+    input[31:0] RDM, DADR,
+    input[2:0] funct3,
+    input clk,
+    input [31:0] INSTR,
+    output[31:0] writeback,
+    output pcstall,misalign_seq
+);
+logic [31:0] buffer;
+logic[31:0] package_out; 
+always_ff@(posedge clk) begin
+     misalign_seq<=misalign_comb;
+end
+assign misalign_comb=(!misalign_seq)((!(INSTR[5])&(((funct3==3'b001)&(DADR[1:0]==2'b11))|((funct3==3'b010)&(DADR[1:0]!=2'b00))|((funct3==3'b101)&(DADR[1:0]==2'b11))))|((INSTR[5])&(((funct3==3'b001)&(DADR[1:0]==2'b11))|((funct3==3'b010)&(DADR[1:0]!=2'b00)))));
+assign writeback= misalign_seq?(package_out:dataword);
+always@(posedge clk) begin
+    if (misalign_comb) begin
+        buffer<=dataword;
+    end
+end
+always_comb begin
+    unique case(funct3) 
+        3'b001: package_out= {{16{dataword[7]}},dataword[7:0],buffer[31:24]};
+        3'b010: begin
+            unique case(DADR[1:0]) 
+                2'b01:package_out={dataword[7:0],buffer[31:8]};
+                2'b10:package_out={dataword[15:0],buffer[31:16]};
+                2'b11:package_out={dataword[23:0],buffer[31:24]};
+            endcase
+        end
+        3'b101: package_out={{16{1'b0}},dataword[7:0],buffer[31:24]};
+    endcase
+end
+        
 
 module extend(
     input logic [31:0] INSTR,
@@ -253,7 +277,7 @@ always_combff begin
             endcase
         end
         7'b0000011: begin
-            IMMCTRL=3'b000; ALUSRC=1; ALUCTRL=4'b0000; RESULTSRC=1; WER=1; WED=0;git
+            IMMCTRL=3'b000; ALUSRC=1; ALUCTRL=4'b0000; RESULTSRC=1; WER=1; WED=0;
 
         
 
