@@ -1,5 +1,5 @@
   module regfile(
-    input logic clk,WER,jump,
+    input logic clk,WER,jump,rst
     input logic [1:0] upperim,
     input logic [31:0] INST,instad,
     input logic [31:0] WD3,
@@ -10,7 +10,12 @@
  assign A1= INST[19:15]; assign A2=INST[24:20]; assign A3=INST[11:7];
  assign WD3=RESULTSRC?writeback:res;
  always_ff@(posedge clk) begin
-    if(WER==1'b1 && A3!=5'b00000) begin
+    if(rst) begin
+        for(int i=0,i<32,i++) begin
+            x[i]<=32'b0;
+        end
+    end
+    else if(WER==1'b1 && A3!=5'b00000) begin
         if(A3==5'b0001) begin
             if(jump) x[1]<=instad+32'd4;
             else x[1]<=WD3;

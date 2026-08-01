@@ -1,5 +1,5 @@
 module ctrlunit(
-    input logic [31:0] INSTR; 
+    input logic [31:0] INSTR, 
     input logic overflow,zero,rs1neg,rs2neg,resneg,
     output logic[2:0] IMMCTRL,
     output logic[3:0] ALUCTRL,
@@ -26,12 +26,12 @@ always_comb begin
         7'b0110011: begin
             IMMCTRL=3'b101; ALUSRC=0; RESULTSRC=0; WER=1; WED=0;
             unique case(funct3)
-                3'b000:ALUCTRL=funct7[5]?(4'b0001:4'b0000);
+                3'b000:ALUCTRL=funct7[5]?4'b0001:4'b0000;
                 3'b001:ALUCTRL=4'b0101;
                 3'b010:ALUCTRL=4'b1001;
                 3'b011:ALUCTRL=4'b1000;
                 3'b100:ALUCTRL=4'b0100;
-                3'b101:ALUCTRL=funct7[5]?(4'b0111:4'b0110);
+                3'b101:ALUCTRL=funct7[5]?4'b0111:4'b0110;
                 3'b110:ALUCTRL=4'b0011;
                 3'b111:ALUCTRL=4'b0010;
             endcase
@@ -44,7 +44,7 @@ always_comb begin
                 3'b010: ALUCTRL=4'b1001;
                 3'b011: ALUCTRL=4'b1000;
                 3'b100: ALUCTRL=4'b0100;
-                3'b101: ALUCTRL=funct7[5]?(4'b0111:4'b0110);
+                3'b101: ALUCTRL=funct7[5]?4'b0111:4'b0110;
                 3'b110: ALUCTRL=4'b0011;
                 3'b111: ALUCTRL=4'b0010;
             endcase
@@ -54,7 +54,7 @@ always_comb begin
         end
         7'b0100011:begin
             IMMCTRL=3'b001; ALUSRC=1; ALUCTRL=4'b0000; RESULTSRC=1'bx; WER=0; WED=1;
-        end'
+        end
         7'b1100011: begin
             IMMCTRL=3'b010; ALUSRC=1'bx; RESULTSRC=1'bx; WER=0; WED=0;
             unique case(funct3)
@@ -84,8 +84,8 @@ always_comb begin
                     else pcsrc= 2'b00;
                 end
                 3'b111: begin
-                    ALUCTRL=4'b001;
-                    if!(((!rs1neg)&rs2neg)|((!rs1neg)&(!rs2neg)&(resneg))|((rs1neg)&(rs2neg)&(resneg))) pcsrc=2'b01;
+                    ALUCTRL=4'b0001;
+                    if(!(((!rs1neg)&rs2neg)|((!rs1neg)&(!rs2neg)&(resneg))|((rs1neg)&(rs2neg)&(resneg)))) pcsrc=2'b01;
                     else pcsrc=2'b00;
                 end
             endcase

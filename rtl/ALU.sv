@@ -30,5 +30,5 @@ always_comb begin
 end
 assign zero= (res==0);
 assign resneg=res[31];
-assign overflow= ((ALUCTRL==4'b000)&addoverflow)|((ALUCTRL==4'b0001)&suboverflow);
+assign overflow= ((ALUCTRL==4'b0000)&addoverflow)|((ALUCTRL==4'b0001)&suboverflow);
 endmodule
