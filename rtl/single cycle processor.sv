@@ -48,7 +48,7 @@ module datamem(
 );
 logic [31:0] mem2 [0:255];
 logic [31:0] DADR;
-assign DADR=misalign_seq((res+32'b4):(res));
+assign DADR=misalign_seq?(res+32'b4):(res);
 always_comb begin
     if(memread) begin
         unique case(funct3)
@@ -234,8 +234,8 @@ module ALU(
 logic [32:0] y;
 logic [31:0] subres,addres;
 logic addoverflow,suboverflow;
-assign rs1neg=rs1neg[31];
-assign rs2neg=rs2neg[31];
+assign rs1neg=rs1[31];
+assign rs2neg=rs2[31];
 always_comb begin
     subres = rs1-rs2;
     suboverflow = (~(rs1[31])&rs2[31]&subres[31])|(rs1[31]&~(rs2[31])&~(subres[31]));
@@ -254,17 +254,17 @@ always_comb begin
                  res={31'b0,y[32]};
         4'b1001: res={31'b0,((subres[31])^(suboverflow))};
     endcase
+end
 assign zero= (res==0);
 assign resneg=res[31];
 assign overflow= ((ALUCTRL==4'b000)&addoverflow)|((ALUCTRL==4'b0001)&suboverflow);
-end
 endmodule
 
 module ctrlunit(
     input logic [31:0] INSTR; 
     input logic overflow,zero,rs1neg,rs2neg,resneg,
-    output logic[2:0] IMMCTRL;
-    output logic[3:0] ALUCTRL;
+    output logic[2:0] IMMCTRL,
+    output logic[3:0] ALUCTRL,
     output logic WER,WED,ALUSRC,RESULTSRC,jump,
     output logic[1:0] pcsrc,upperim
 
@@ -283,7 +283,7 @@ logic memread, memwrite;
 assign jump=(op==7'b1101111|op==7'b1100111);
 assign memread=(op==7'b0000011);
 assign memwrite=(op==7'b0100011);
-always_combff begin
+always_comb begin
     unique case(op)
         7'b0110011: begin
             IMMCTRL=3'b101; ALUSRC=0; RESULTSRC=0; WER=1; WED=0;
@@ -356,7 +356,7 @@ always_combff begin
             ALUCTRL=4'b0000; IMMCTRL=3'b100; pcsrc=2'b01; ALUSRC=1'bx; RESULTSRC=1'bx; WER=1'b1; WED=1'b0;
         end
         7'b1100111: begin
-            ALUCTRL=4'b0000; IMMCTRL=3'b100; pcsrc=2'b10; ALUSRC=1'b1; RESULTSRC=1'bx; WER=1'b0; WED=1'b0;
+            ALUCTRL=4'b0000; IMMCTRL=3'b100; pcsrc=2'b10; ALUSRC=1'b1; RESULTSRC=1'bx; WER=1'b1; WED=1'b0;
         end
         7'b0110111: begin
             ALUCTRL=4'b0000; IMMCTRL=3'b011; ALUSRC=1'b1; RESULTSRC=1'b0; WER=1'b1; WED=1'b0;
