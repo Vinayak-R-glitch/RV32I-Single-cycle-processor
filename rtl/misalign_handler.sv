@@ -1,13 +1,14 @@
 module datamem_outhandler(
     input[31:0] RDM, DADR,
-    input[2:0] funct3,
     input clk,
     input [31:0] INSTR,
     output[31:0] writeback,
     output pcstall,misalign_seq
 );
-logic [31:0] buffer;
+logic [31:0] buffer; logic[2:0] funct3
+logic misalign_comb;
 logic[31:0] package_out,bufferin,dataword;
+assign funct3=INSTR[14:12];
 always_comb begin
     if(misalign_seq==1'b0) dataword=RDM;
     else bufferin=RDM;

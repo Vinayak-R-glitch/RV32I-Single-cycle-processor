@@ -1,13 +1,13 @@
   module regfile(
     input logic clk,WER,jump,
     input logic [1:0] upperim,
-    input logic [31:0] INST,instad,
+    input logic [31:0] INSTR,instad,
     input logic [31:0] WD3,
     output logic [31:0] RD1,RD2
  );
  logic [31:0] x [0:31];
  logic [4:0] A1,A2,A3;
- assign A1= INST[19:15]; assign A2=INST[24:20]; assign A3=INST[11:7];
+ assign A1= INSTR[19:15]; assign A2=INSTR[24:20]; assign A3=INSTR[11:7];
  assign WD3=RESULTSRC?writeback:res;
  always_ff@(posedge clk) begin
     if(WER==1'b1 && A3!=5'b00000) begin
@@ -30,12 +30,12 @@ assign RD2=(A2==0)?(32'b0):(x[A2]);
 endmodule
 
 module instrmem(
-    input logic[31:0] IADR,
-    output logic[31:0] INST
+    input logic[31:0] instad,
+    output logic[31:0] INSTR
 );
 logic [31:0] mem1 [0:255];
 always_comb begin
-    INST=mem1[IADR[31:2]];
+    INSTR=mem1[instad[31:2]];
 end
 endmodule
 

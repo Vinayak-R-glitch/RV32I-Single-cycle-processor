@@ -1,13 +1,13 @@
   module regfile(
     input logic clk,WER,jump,rst
     input logic [1:0] upperim,
-    input logic [31:0] INST,instad,
+    input logic [31:0] INSTR,instad,
     input logic [31:0] WD3,
     output logic [31:0] RD1,RD2
  );
  logic [31:0] x [0:31];
  logic [4:0] A1,A2,A3;
- assign A1= INST[19:15]; assign A2=INST[24:20]; assign A3=INST[11:7];
+ assign A1= INSTR[19:15]; assign A2=INSTR[24:20]; assign A3=INSTR[11:7];
  assign WD3=RESULTSRC?writeback:res;
  always_ff@(posedge clk) begin
     if(rst) begin

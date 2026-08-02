@@ -1,12 +1,12 @@
 module datamem(  
     input logic clk,WED,memread,memwrite,misalign_seq,
-    input logic[2:0] funct3,
-    input logic[31:0] res, //alu result
+    input logic[31:0] res,INSTR, //alu result
     input logic[31:0] WD,
     output logic [31:0]RDM
 );
 logic [31:0] mem2 [0:255];
 logic [31:0] DADR;
+logic[2:0] funct3; assign funct3=INSTR[14:12];
 assign DADR=misalign_seq?(res+32'b4):(res);
 always_comb begin
     if(memread) begin
